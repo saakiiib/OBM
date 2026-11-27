@@ -1,0 +1,3 @@
+<?php namespace Database\Seeders;
+use App\Models\Entry; use Illuminate\Database\Seeder;
+class DatabaseSeeder extends Seeder { public function run(): void {foreach(json_decode(file_get_contents(database_path('directory.json')),true,512,JSON_THROW_ON_ERROR) as $r){if(!filter_var($r['website']??'',FILTER_VALIDATE_URL))continue; Entry::firstOrCreate(['fingerprint'=>hash('sha256','directory:'.$r['id'])],['type'=>'directory','slug'=>$r['id'],'title'=>$r['name'],'title_bn'=>$r['bn']??null,'summary'=>$r['description']??null,'category'=>$r['category'],'city'=>$r['district']??null,'url'=>$r['website'],'status'=>'published','details'=>['verification'=>'Source candidate; editorial review pending']]);}}}

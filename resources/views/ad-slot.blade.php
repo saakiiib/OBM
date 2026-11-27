@@ -1,0 +1,1 @@
+@if(config('advertising.preview') && app()->environment(['local','staging']))<aside class="obm-ad-reserve container" aria-label="Advertising layout preview"><span class="obm-ad-label">Advertisement · Layout preview</span><p>{{ str_replace('_',' ', $slot) }} · Responsive advertising position</p></aside>@endif

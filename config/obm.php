@@ -1,0 +1,1 @@
+<?php return ['rss_hosts'=>array_filter(array_map('trim',explode(',',env('OBM_RSS_HOSTS','')))), 'recipient'=>env('OBM_SUBMISSION_EMAIL','info@mentosoftware.co.uk'),'adzuna_id'=>env('ADZUNA_APP_ID'),'adzuna_key'=>env('ADZUNA_APP_KEY'),'types'=>['job'=>'Jobs','scholarship'=>'Scholarships','event'=>'Events','news'=>'News','directory'=>'Directory']];

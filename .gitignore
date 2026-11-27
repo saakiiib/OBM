@@ -1,0 +1,50 @@
+# Laravel default ignores
+/.phpstorm/
+/.vscode/
+/.idea/
+/nbproject/
+
+# Composer
+/vendor/
+/composer.lock
+
+# Laravel
+/.env
+/.env.backup
+/.env.local
+/.env.local.example
+/.env.production
+/.env.production.example
+
+# Laravel storage/logs
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/framework/cache/*
+!/storage/framework/cache/data/.gitkeep
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitkeep
+/storage/framework/views/*
+!/storage/framework/views/.gitkeep
+
+# Laravel build files
+/node_modules
+/public/hot
+/public/build
+
+# Laravel Pint formatter
+/pint.json
+
+# PHPunit
+.phpunit.result.cache
+/phpunit.xml
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
+*.pid
+*.seed
+*.sqlite3
+.phpunit.xml
+.DS_Store
+.env.backup

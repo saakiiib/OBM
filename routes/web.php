@@ -1,0 +1,11 @@
+<?php
+use Illuminate\Support\Facades\Route; use App\Http\Controllers\{PortalController as P,AdminController as A};
+Route::get('/',[P::class,'legacy']);Route::redirect('/index.html','/',301);Route::redirect('/submit.html','/submit',301);Route::view('/submit','submit');Route::post('/submit',[P::class,'submit'])->middleware('throttle:5,10');Route::get('/opportunities/{type}',[P::class,'index']);Route::get('/entry/{slug}',[P::class,'show']);Route::get('/sitemap.xml',[P::class,'sitemap']);Route::get('/robots.txt',fn()=>response("User-agent: *\nDisallow: /admin\nSitemap: ".url('/sitemap.xml')."\n",200,['Content-Type'=>'text/plain']));
+Route::view('/admin/login','login')->name('login');Route::post('/admin/login',[A::class,'login'])->middleware('throttle:5,1');
+Route::middleware(['auth',\App\Http\Middleware\AdminOnly::class])->prefix('admin')->group(function(){Route::get('/',[A::class,'dashboard']);Route::post('/logout',[A::class,'logout']);Route::post('/entries',[A::class,'entry']);Route::get('/entries/{entry}',fn(\App\Models\Entry $entry)=>view('edit',['entry'=>$entry]));Route::post('/entries/{entry}',[A::class,'entry']);Route::post('/entries/{entry}/verify',[A::class,'verify']);Route::post('/sources',[A::class,'source']);Route::post('/sources/{source}',[A::class,'source']);Route::post('/submissions/{submission}',[A::class,'submission']);});
+Route::get('/scholarship-sources',fn()=>view('scholarship-sources',['sources'=>P::active()->where('type','directory')->where('category','Scholarship providers')->orderBy('title')->get()]));
+Route::get('/directory.html',fn(\Illuminate\Http\Request $r)=>redirect('/opportunities/directory'.($r->filled('q')?'?'.http_build_query(['q'=>(string)$r->input('q')]):''),301));
+Route::get('/ads.txt',function(){ $id=config('advertising.publisher');abort_unless(preg_match('/^pub-[0-9]{16}$/D',$id),404);return response('google.com, '.$id.', DIRECT, f08c47fec0942fa0'.PHP_EOL,200,['Content-Type'=>'text/plain']);});
+Route::get('/profile-{slug}.html',fn(string $slug)=>redirect('/entry/'.$slug,301))->where('slug','[a-z0-9-]+');
+Route::get('/listing.html',function(\Illuminate\Http\Request $r){$id=$r->input('id');return redirect(is_string($id)&&preg_match('/^[a-z0-9-]+$/D',$id)?'/entry/'.$id:'/opportunities/directory',301);});
+Route::get('/{page}.html',[P::class,'legacy'])->where('page','[a-z0-9-]+');
