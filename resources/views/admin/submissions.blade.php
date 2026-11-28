@@ -1,0 +1,4 @@
+@extends('admin.layout')
+@section('body')
+<h1>Submissions</h1><p>Reviewing a submission does not publish a listing. Create or edit the relevant entry in Content after verifying the information.</p>@foreach($submissions as $s)<article class="panel"><strong>{{ $s->reference }} · {{ $s->listing }}</strong><p>{{ $s->name }} · {{ $s->email }} · {{ $s->type }} · {{ $s->region }}</p><p>{{ $s->website }}</p><p style="white-space:pre-wrap">{{ $s->message }}</p><p>Email: {{ $s->emailed_at??'Not confirmed' }}</p><form method="post" action="/admin/submissions/{{ $s->id }}">@csrf<select name="status">@foreach(['pending','reviewed','rejected'] as $t)<option @selected($s->status===$t)>{{ $t }}</option>@endforeach</select><button>Save review status</button></form></article>@endforeach{{ $submissions->links('admin.pagination') }}
+@endsection
