@@ -2,7 +2,37 @@
 use App\Models\{Entry,Submission,Category}; use Illuminate\Http\Request; use Illuminate\Support\Facades\{Mail,Log}; use Illuminate\Support\Str;
 class PortalController {
  public static function active(){return Entry::where('status','published')->where(fn($q)=>$q->where('type','!=','directory')->orWhereNull('category')->orWhereIn('category',Category::where('enabled',true)->select('name')))->where(fn($q)=>$q->whereNull('expires_at')->orWhere('expires_at','>',now()))->where(fn($q)=>$q->whereNull('deadline')->orWhere('deadline','>',now()))->where(fn($q)=>$q->whereNull('event_start')->orWhere('event_start','>',now()));}
- public function home(){return view('home',['categories'=>Category::where('enabled',true)->where('featured',true)->orderBy('sort_order')->get(),'groups'=>collect(['job','scholarship','event','news'])->mapWithKeys(fn($t)=>[$t=>self::active()->where('type',$t)->latest()->limit(4)->get()]),'featured'=>self::active()->where('type','directory')->whereNotNull('verified_at')->latest()->limit(6)->get()]);}
+ public function home(Request $request){
+  $enabled=Category::where('enabled',true)->orderBy('sort_order')->get();
+  $bySlug=$enabled->keyBy('slug');
+  $resources=function(string $category,array $preferred=[],int $limit=6) use ($bySlug){
+   $cat=$bySlug->get($category); if(!$cat)return collect();
+   $query=self::active()->where('type','directory')->where('category',$cat->name)->whereNotNull('url');
+   if($preferred)$query->whereIn('slug',$preferred);
+   $rows=$preferred?$query->get():$query->orderBy('title')->limit($limit)->get();
+   return $preferred?$rows->sortBy(fn($e)=>array_search($e->slug,$preferred,true))->take($limit)->values():$rows;
+  };
+  // Curated publisher groups use published directory records, never sample headlines.
+  $bangla=['resource-prothom-alo','resource-bangladesh-pratidin','resource-jugantor','resource-kaler-kantho','resource-samakal','resource-ittefaq','resource-manab-zamin','resource-janakantha','resource-bangla-tribune','resource-jago-news-24'];
+  $english=['resource-the-daily-star','resource-dhaka-tribune','resource-new-age','resource-bdnews24-com','resource-the-business-standard','resource-the-financial-express','resource-daily-sun'];
+  $international=['resource-bbc-bangla','resource-voa','resource-dw'];
+  $regional=['resource-anandabazar-patrika','resource-ei-samay','resource-sangbad-pratidin','resource-aajkaal'];
+  $publisherRows=function(array $slugs){return self::active()->where('type','directory')->whereIn('slug',$slugs)->whereNotNull('url')->get()->sortBy(fn($e)=>array_search($e->slug,$slugs,true))->values();};
+  $mediaTabs=['bangla'=>'Bangla News','english'=>'English News','international'=>'International','all'=>'All News','regional'=>'Regional','probashi'=>'Probashi'];
+  $selected=$request->query('media','bangla'); if(!is_string($selected)||!isset($mediaTabs[$selected]))$selected='bangla';
+  $mediaGroups=['bangla'=>$publisherRows($bangla),'english'=>$publisherRows($english),'international'=>$publisherRows($international),'regional'=>$publisherRows($regional)->concat($resources('regional-news',[],12))->unique('id'),'probashi'=>$resources('probashi-media',[],12)];
+  $mediaGroups['all']=collect($mediaGroups)->flatten(1)->unique('id')->values();
+  $papers=$mediaGroups[$selected]->take(12);
+  $popular=$mediaGroups['bangla']->take(8);
+  $tv=['resource-somoy-tv','resource-channel-i','resource-independent-tv','resource-atn-bangla','resource-bangladesh-betar','resource-radio-foorti'];
+  $gov=['bangladesh-national-portal','mygov-bd','passport-bangladesh','nid-bangladesh','birth-registration','resource-e-return','resource-land-services','brta'];
+  $uni=['university-of-dhaka','buet','jahangirnagar-university','rajshahi-university','chittagong-university','north-south-university'];
+  return view('home',['categories'=>$enabled->where('featured',true)->values(),'availableCategories'=>$bySlug,
+   'groups'=>collect(['job','scholarship','event','news'])->mapWithKeys(fn($t)=>[$t=>self::active()->where('type',$t)->latest()->limit(4)->get()]),
+   'featured'=>self::active()->where('type','directory')->whereNotNull('verified_at')->latest()->limit(6)->get(),
+   'papers'=>$papers,'popularPapers'=>$popular,'mediaTabs'=>$mediaTabs,'selectedMedia'=>$selected,'directoryPreview'=>self::active()->where('type','directory')->whereNotNull('url')->orderBy('title')->limit(8)->get(),'abroadResources'=>$resources('bangladesh-abroad',[],8),'overseasJobs'=>$publisherRows(['resource-uk-jobs','resource-saudi-arabia-jobs','resource-uae-jobs','resource-qatar-jobs','resource-europe-jobs','resource-nhs-jobs','resource-reed','resource-usajobs']),'broadcast'=>$resources('news-media',$tv,6),'universities'=>$resources('education',$uni,6),'government'=>$resources('government',$gov,8),
+   'fallbacks'=>['job'=>$resources('jobs',[],5),'scholarship'=>$resources('scholarship-providers',[],5),'event'=>$resources('community-resources',[],5),'news'=>collect()]]);
+ }
  public function categories(){return view('categories',['categories'=>Category::where('enabled',true)->orderBy('sort_order')->get(),'counts'=>self::active()->where('type','directory')->selectRaw('category,count(*) as total')->groupBy('category')->pluck('total','category')]);}
  public function category(Request $r,string $slug){$category=Category::where('slug',$slug)->where('enabled',true)->firstOrFail();return $this->index($r,'directory',$category);}
  public function index(Request $r,string $type,?Category $category=null){abort_unless(array_key_exists($type,config('obm.types')),404);$q=$this->active()->where('type',$type);if($category)$q->where('category',$category->name);$r->validate(['q'=>'nullable|string|max:100','country'=>'nullable|string|max:100','category'=>'nullable|string|max:120']);if(!$category&&$type==='directory'&&$r->filled('category')){$selected=Category::where('slug',$r->input('category'))->where('enabled',true)->first();if($selected)$q->where('category',$selected->name);else $q->whereRaw('1=0');}if($r->filled('q')){$s=mb_substr((string)$r->input('q'),0,100);$q->where(fn($a)=>$a->where('title','like','%'.$s.'%')->orWhere('title_bn','like','%'.$s.'%')->orWhere('summary','like','%'.$s.'%'));}if($r->filled('country'))$q->where('country',mb_substr((string)$r->input('country'),0,100));return view('entries',['category'=>$category,'directoryCategories'=>Category::where('enabled',true)->orderBy('sort_order')->get(),'type'=>$type,'entries'=>$q->latest()->paginate(24)->withQueryString(),'countries'=>$this->active()->where('type',$type)->whereNotNull('country')->distinct()->orderBy('country')->pluck('country')]);}
